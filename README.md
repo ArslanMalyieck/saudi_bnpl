@@ -1,28 +1,129 @@
-# Saudi BNPL
+# Saudi BNPL (Pilot)
 
-A Frappe v16 / ERPNext pilot for **manual statement preparation**, not a payment integration. It is installed on the local `localhost` site but has not been tested against real accounting transactions. Finance and the site administrator must review the design and test it on an isolated copy before production use. Installation does not create or change accounts, payment modes, POS profiles, invoices, tax settings or financial transactions.
+Manual settlement workflow for Tabby, Tamara, Emkan, NEO, and Madfu on ERPNext v16. This app is not a payment integration. It helps finance book BNPL provider statements safely using a draft Journal Entry, with a controlled setup and clear responsibilities.
 
-## Setup And Workflow
+Status: pilot-quality. Test on an isolated copy before production use.
 
-1. The supported provider names are **Tabby, Tamara, Emkan, NEO and Madfu**. For each company/provider in use, an Accounts Manager creates an enabled **BNPL Provider Account** with existing Company, Mode of Payment, clearing Account, payout bank Account and Supplier. The company and selected accounts must use SAR; accounts must belong to the company, be enabled leaves and be distinct. Clearing must have `root_type` Asset, `report_type` Balance Sheet and `account_type` Cash; the payout account must be a Bank account. The enabled Mode of Payment must already map that company to the clearing account. Configure the native POS Profile/payment mode independently, according to finance's approved ERPNext procedures. The app does not edit these masters.
-2. Finance uses the native POS Sales Invoice payment mode for the provider, and independently reviews the resulting clearing ledger and the provider statement. No invoice-level matching, payment confirmation, provider API, payout detection or refund processing is provided.
-3. For a nonzero commission, finance independently records and submits the provider's fee tax invoice as a Purchase Invoice for the configured supplier and company, with its supplier invoice number, SAR payable account and applicable fee and VAT rows. The payout date cannot precede the invoice posting date. Finance chooses and verifies the VAT account and the existing tax reporting configuration. The app does not create or modify this invoice, determine tax eligibility, or assert VAT compliance or recovery. With zero fee and VAT, do not attach a Purchase Invoice.
-4. Create an **Open BNPL Settlement** with the provider account, company, unique provider statement reference, payout date, gross, fee, VAT, net, the submitted fee invoice and its VAT account when applicable, plus an optional statement attachment and notes. All amounts are SAR with at most two decimals; gross and net are positive, fee/VAT nonnegative, and gross must equal net plus fee plus VAT. A statement is an operational document, explicitly not submittable. The reference remains reserved when it is closed. Provider/company/reference identity is permanent; close an erroneous record rather than deleting or reusing it.
-5. Save, then choose **Create Draft Journal Entry** and confirm. The app checks write permission on the statement, read permission on the provider and fee invoice, and Journal Entry create permission. It reloads and locks the statement, checks that it is open and has no linked JE, revalidates configuration and the fee invoice, and inserts and links one standard **draft** Journal Entry in the request transaction. For a fee it debits the payout bank for net, debits the supplier payable for fee plus VAT with the Purchase Invoice reference, and credits clearing for gross. With zero fee/VAT, it creates only bank and clearing lines. Nothing is submitted or reconciled. A generated link cannot be cleared through the app, even if the JE is cancelled or deleted. The app will not automatically replace or cancel it.
-6. Finance reviews the original provider statement, actual bank receipt, clearing balance, fee invoice and full draft JE, including every account, date, default field and accounting dimension. The app preserves ERPNext's post-insert defaults rather than suppressing them; defaults and custom hooks may assign dimensions that finance must correct. Finance must revalidate immediately before manually submitting the JE using standard ERPNext controls and then perform bank reconciliation in ERPNext. If rejected, changed, cancelled or deleted, resolve the matter manually under finance's procedures. Closing the operational statement is administrative only and is not evidence of posting, payment, bank reconciliation or settlement.
+## Compatibility
 
-## Scope And Controls
+- Frappe/ERPNext: v16
+- Currency: SAR only (company, accounts, invoices)
+- Multi-company supported in configuration; permissions must be reviewed
 
-- **Cash classification requires finance approval.** The native v16 Mode of Payment account selector in this bench filters to Bank, Cash or Receivable. This app rejects Bank clearing to avoid a second Bank leg in bank reconciliation, and rejects party Receivable accounts. Cash is the remaining selector-compatible type. It is an ERPNext account classification for a provider clearing balance, not a claim that the balance is physical cash. It can affect cash reports, controls and other site behavior; finance must assess and approve it and test the complete POS and reconciliation flow on an isolated site. If that classification is unacceptable, do not use this workflow; no alternative mapping has been verified here.
-- Only SAR company currency, SAR account currency and SAR invoices are supported. Returns, foreign currency/taxes, partially paid fee invoices, advances, multi-invoice or partial settlements, multiple invoice payment terms, rounding adjustments, withholding and other charges are outside the supported workflow. Gross is not verified against individual POS invoices, a clearing balance or a bank transaction.
-- Fee invoices must be submitted, not held, non-return, non-stock, fully outstanding for exactly fee plus VAT, with net total equal to fee and no rounding, advance or write-off. All tax rows must be additive total rows on the finance-selected VAT account and their after-discount amounts must add to statement VAT. VAT-free fees must have no tax rows. If more than one submitted invoice has the exact same stored supplier, company and supplier invoice number, the app fails closed without disclosing the other invoice. Different capitalization, whitespace or other reference variants are not treated as exact matches. This check is not a database uniqueness constraint and cannot prevent concurrent submissions or catch documents submitted later. Finance must independently check duplicates. This intentionally excludes more complicated legitimate tax treatments. Finance must establish that the selected rows are actually the correct VAT; matching account and amounts cannot establish tax treatment, legality or reporting correctness.
-- The deterministic database document name hashes normalized company, provider name and statement reference using SHA-256. Case, Unicode compatibility forms and whitespace variations are treated as the same reference. Deletion and renaming are disabled through these DocTypes, including closed statements. Database administrators or privileged custom code can bypass app controls; back up and govern master changes. Existing external transactions and semantically equivalent references with different identifiers are not detected.
-- **Company renaming is unsupported.** Company names participate in both provider and statement hashes. A standard Company rename can update link fields without recomputing document names, breaking validation and duplicate detection or allowing another reference to be created under a different hash. Do not rename a referenced Company while using this app; an explicitly reviewed data migration and collision analysis would be needed. The app does not hook or block Company renames.
-- Once any statement references a provider configuration, its company, provider name, payment mode, clearing account, bank account and supplier are frozen, even after the statement is closed. Enable/disable remains available; disabling does not require currently valid external accounts or payment mode, but enabling does. Statement saves and draft creation reload and lock the provider; normal provider edits check for referencing statements using a locking read. Separate changes to the existing Mode of Payment, Account, Supplier or Company masters are not frozen, and privileged code can bypass these checks. Lock conflicts or deadlocks can require a manual retry. These locks have not been integration-tested and are not a complete concurrency guarantee.
-- A row lock guards concurrent generation on the same statement. Fee invoice locking and an additional check guard against another linked BNPL draft using that invoice. These checks are not an end-to-end concurrency guarantee: ordinary ERPNext drafts, external integrations, payments, cancellations, independent postings, configuration changes, custom hooks, administrator actions and changes after draft creation are outside this app's control. Finance must inspect for duplicates and revalidate before submitting. Never submit blindly.
-- Standard Journal Entry validation, authorization, posting and reconciliation remain ERPNext responsibilities. Site-specific required accounting dimensions, custom scripts or permissions may prevent draft creation; the app does not bypass them or guarantee that defaults are appropriate. A failing request should roll back its insert and link under Frappe's normal request transaction handling, but this has not been integration-tested on this site. Independent ERPNext operations are not made atomic by this app.
-- Both app DocTypes initially grant access only to Accounts Manager, not Accounts User. Company-level isolation has not been independently audited, and Accounts Managers may have broad cross-company access. Review actual site role permissions, user permissions, sharing, audit logs and customizations before use. Attachments and notes can contain sensitive provider, bank and commercial data. Use private attachments with restricted access, verify the site's file permissions and backup/retention rules, and do not put credentials or payment-card/customer data in notes. The app sends no provider requests and stores no API credentials.
+## Install
 
-## Isolated Tests
+1. Get the app into your bench:
+```
+bench get-app https://github.com/ArslanMalyieck/saudi_bnpl.git
+```
+2. Install on a site:
+```
+bench --site your.site install-app saudi_bnpl
+bench --site your.site migrate
+```
 
-From the app directory, with Frappe importable, run `PYTHONDONTWRITEBYTECODE=1 /home/arslan/frappe-bench/env/bin/python -m unittest discover -s tests -v`. The tests use pure functions and mocked Frappe operations; they do not test SQL locks, POS behavior, tax reports, real Journal Entry validation/posting, browser behavior, or transaction rollback. Obtain finance approval and perform isolated integration, permission, concurrent-request and end-to-end accounting tests before considering production use.
+## Configure
+
+Create one BNPL Provider Account per company/provider pair.
+
+- Provider Name: Tabby, Tamara, Emkan, NEO, Madfu
+- Company: target company
+- Mode of Payment: existing MoP configured to post to the clearing account for that company
+- Clearing Account: Asset/Balance Sheet account with account_type = Cash
+- Payout Bank Account: Bank account receiving provider deposits
+- Supplier: the BNPL provider as Supplier master
+
+Notes
+- Do not change provider configs once used. You can disable/enable.
+- Ensure the Mode of Payment maps to the clearing account for this company (standard ERPNext setting).
+- The clearing account being classified as Cash can affect cash reports; finance must approve.
+
+## POS Sale Flow (at invoice time)
+
+Goal: customer balance zero at sale time; clearing accumulates provider gross.
+
+1. POS user selects Mode of Payment = BNPL <Provider> on the Sales Invoice.
+2. ERPNext GL on submit:
+   - Dr Clearing (BNPL MoP default account)
+   - Cr Income and Cr Output VAT (standard)
+   - Debtors cleared by POS payment row
+3. POS returns must use the same provider MoP to reverse the clearing as needed.
+
+## Settlement Flow (at payout time)
+
+Inputs: provider statement (gross, fee, VAT, net), bank credit, fee tax invoice.
+
+1. Record the provider fee Purchase Invoice (Supplier = provider supplier) for fee and VAT.
+   - SAR only; fully outstanding; one set of additive VAT rows on the selected VAT account; no advances/write-off/rounding drift.
+2. Create BNPL Settlement with:
+   - Provider Account, Company
+   - Statement Reference (unique per provider/company)
+   - Payout Date
+   - Gross, Fee, VAT, Net (SAR, 2 decimals; gross = net + fee + VAT)
+   - Fee Purchase Invoice and VAT Account (if fee > 0)
+3. Click Create Draft Journal Entry. The app creates draft JE:
+   - Dr Bank = Net
+   - Dr Supplier Payable = Fee + VAT (with PI reference)
+   - Cr Clearing = Gross
+4. Finance reviews and submits the JE, then matches bank credit in Bank Reconciliation.
+
+### Example
+
+POS sale with VAT 15%:
+- Gross (incl VAT): 115.0
+- Fee: 10.0
+- VAT on fee: 1.5
+- Net payout: 103.5
+
+Draft JE:
+- Dr Bank 103.5
+- Dr Supplier Payable 11.5 (ref Purchase Invoice)
+- Cr Clearing 115.0
+
+## Permissions
+
+- BNPL Provider Account and BNPL Settlement: Accounts Manager (read/write/create)
+- Journal Entry creation requires user to have JE create permission
+
+## Demo And Tests
+
+CLI demo helpers (do not use in production):
+
+```
+# Quick Tamara POS scenario for a company (creates item, customer, fee PI, settlement, draft JE)
+bench --site your.site execute saudi_bnpl.scripts.demo_setup.pos_via_provider_scenario --kwargs "{'company':'BOT Solutions','provider':'Tamara'}"
+
+# Create provider config only
+bench --site your.site execute saudi_bnpl.scripts.demo_setup.create_provider --kwargs "{'company':'BOT Solutions','provider':'Tabby','clearing_account':'Cash - BS','bank_account':'Bank - BS'}"
+
+# Create fee PI only
+bench --site your.site execute saudi_bnpl.scripts.demo_setup.create_fee_invoice --kwargs "{'company':'BOT Solutions','provider':'Tabby','vat_account':'Output VAT - BS'}"
+```
+
+Unit tests (pure/mocked):
+```
+cd apps/saudi_bnpl
+PYTHONDONTWRITEBYTECODE=1 /path/to/bench/env/bin/python -m unittest discover -s tests -v
+```
+
+Tests validate hashing, amounts, provider config rules, and draft creation logic, but do not exercise real GL posting, scheduler, SQL lock behavior, or browser flows.
+
+## Limitations (Important)
+
+- No provider API integration, payout detection, invoice matching, or refunds handling
+- SAR only; no foreign currency
+- Fee invoice must exactly equal fee and VAT; no partial/complex terms
+- Concurrency protection is best-effort; finance must review before submission
+- Company rename unsupported (document names are hash-based)
+
+## Uninstall
+
+This app creates no background jobs or external credentials. Remove via bench:
+```
+bench --site your.site uninstall-app saudi_bnpl
+bench --site your.site migrate
+```
+
+## Support
+
+Pilot-quality. Review with finance and test in isolation before use. Do not submit draft JEs without independent validation and bank reconciliation.
