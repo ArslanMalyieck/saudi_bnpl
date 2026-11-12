@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+
+# Frappe/ERPNext build artifacts (none expected here, but safe)
+assets/
+*.min.js
+*.min.css
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

@@ -1,0 +1,25 @@
+{
+ "doctype":"DocType", "name":"BNPL Settlement", "module":"Saudi BNPL", "engine":"InnoDB",
+ "creation":"2026-11-12 00:00:00.000000", "modified":"2026-11-12 00:00:00.000000", "modified_by":"Administrator", "owner":"Administrator",
+ "is_submittable":0, "track_changes":1, "sort_field":"modified", "sort_order":"DESC",
+ "field_order":["provider_account","company","statement_reference","status","payout_date","gross","fee","vat","net","tax_invoice","vat_account","statement_attachment","notes","journal_entry"],
+ "fields":[
+  {"fieldname":"provider_account","fieldtype":"Link","label":"Provider Account","options":"BNPL Provider Account","reqd":1,"in_list_view":1,"set_only_once":1,"search_index":1},
+  {"fieldname":"company","fieldtype":"Link","label":"Company","options":"Company","reqd":1,"in_list_view":1,"set_only_once":1},
+  {"fieldname":"statement_reference","fieldtype":"Data","label":"Provider Statement Reference","reqd":1,"in_list_view":1,"set_only_once":1,"description":"Pilot only: finance must independently verify the statement, POS clearing balance and payout. No provider or invoice matching is performed."},
+  {"fieldname":"status","fieldtype":"Select","label":"Operational Status","options":"Open\nClosed","default":"Open","reqd":1,"in_list_view":1,"description":"Closing is administrative only; it does not post or cancel anything."},
+  {"fieldname":"payout_date","fieldtype":"Date","label":"Payout Date","reqd":1},
+  {"fieldname":"gross","fieldtype":"Currency","label":"Gross (SAR)","options":"Company:company:default_currency","precision":"2","reqd":1},
+  {"fieldname":"fee","fieldtype":"Currency","label":"Commission (SAR)","options":"Company:company:default_currency","precision":"2","default":"0"},
+  {"fieldname":"vat","fieldtype":"Currency","label":"VAT (SAR)","options":"Company:company:default_currency","precision":"2","default":"0"},
+  {"fieldname":"net","fieldtype":"Currency","label":"Net Payout (SAR)","options":"Company:company:default_currency","precision":"2","reqd":1},
+  {"fieldname":"tax_invoice","fieldtype":"Link","label":"Submitted Provider Fee Purchase Invoice","options":"Purchase Invoice","search_index":1},
+  {"fieldname":"vat_account","fieldtype":"Link","label":"Fee Invoice VAT Account","options":"Account","description":"Finance selects the account used by all VAT rows on the fee invoice."},
+  {"fieldname":"statement_attachment","fieldtype":"Attach","label":"Provider Statement Attachment"},
+  {"fieldname":"notes","fieldtype":"Small Text","label":"Notes"},
+  {"fieldname":"journal_entry","fieldtype":"Link","label":"Generated Journal Entry","options":"Journal Entry","read_only":1,"no_copy":1}
+ ],
+ "permissions":[
+  {"role":"Accounts Manager","read":1,"write":1,"create":1,"report":1}
+ ]
+}

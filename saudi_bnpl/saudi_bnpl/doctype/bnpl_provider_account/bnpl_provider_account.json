@@ -1,0 +1,19 @@
+{
+ "doctype": "DocType", "name": "BNPL Provider Account", "module": "Saudi BNPL",
+ "engine": "InnoDB", "creation": "2026-11-12 00:00:00.000000", "modified": "2026-11-12 00:00:00.000000",
+ "modified_by": "Administrator", "owner": "Administrator", "track_changes": 1,
+ "title_field": "provider_name", "search_fields": "provider_name,company", "sort_field": "modified", "sort_order": "DESC",
+ "field_order": ["provider_name", "company", "enabled", "mode_of_payment", "clearing_account", "bank_account", "supplier"],
+ "fields": [
+  {"fieldname":"provider_name","fieldtype":"Select","label":"Provider Name","options":"\nTabby\nTamara\nEmkan\nNEO\nMadfu","reqd":1,"in_list_view":1,"set_only_once":1},
+  {"fieldname":"company","fieldtype":"Link","label":"Company","options":"Company","reqd":1,"in_list_view":1,"set_only_once":1},
+  {"fieldname":"enabled","fieldtype":"Check","label":"Enabled","default":"1"},
+  {"fieldname":"mode_of_payment","fieldtype":"Link","label":"Mode of Payment","options":"Mode of Payment","reqd":1},
+  {"fieldname":"clearing_account","fieldtype":"Link","label":"Clearing Account","options":"Account","reqd":1,"description":"Asset clearing account classified as Cash for the native Mode of Payment selector. This classification can affect reports; finance must approve it."},
+  {"fieldname":"bank_account","fieldtype":"Link","label":"Payout Bank Account","options":"Account","reqd":1},
+  {"fieldname":"supplier","fieldtype":"Link","label":"Provider Supplier","options":"Supplier","reqd":1}
+ ],
+ "permissions": [
+  {"role":"Accounts Manager","read":1,"write":1,"create":1,"report":1}
+ ]
+}
