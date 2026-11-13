@@ -422,3 +422,77 @@ def probe_latest_fee_invoice():
     name = rows[0]["name"]
     taxes = frappe.get_all("Purchase Taxes and Charges", filters={"parent": name}, fields=["account_head", "category", "add_deduct_tax", "rate", "tax_amount_after_discount_amount", "base_tax_amount_after_discount_amount"])
     return {"invoice": rows[0], "taxes": taxes}
+
+
+def create_native_pos_bnpl_invoice(
+    company: str = "BOT Solutions",
+    pos_profile: str = "Shop B",
+    provider: str = "Tamara",
+    cashier: str = "test@test.com",
+):
+    """Create and consolidate one native POS Invoice for manual settlement testing.
+
+    This intentionally creates submitted accounting test data and closes the
+    cashier's current POS opening entry. Invoke only on a test site.
+    """
+    frappe.only_for("System Manager")
+    if frappe.db.get_value("POS Profile", pos_profile, "company") != company:
+        raise RuntimeError("POS Profile does not belong to the requested company")
+
+    mode_of_payment = f"BNPL {provider}"
+    if not frappe.db.exists(
+        "POS Payment Method",
+        {"parent": pos_profile, "parenttype": "POS Profile", "mode_of_payment": mode_of_payment},
+    ):
+        raise RuntimeError(f"{mode_of_payment} is not configured on POS Profile {pos_profile}")
+
+    opening_name = frappe.db.get_value(
+        "POS Opening Entry",
+        {"pos_profile": pos_profile, "user": cashier, "status": "Open", "docstatus": 1},
+        "name",
+    )
+    if not opening_name:
+        raise RuntimeError(f"No open POS Opening Entry found for {cashier} / {pos_profile}")
+
+    frappe.db.set_single_value("POS Settings", "invoice_type", "POS Invoice")
+    previous_user = frappe.session.user
+    try:
+        frappe.set_user(cashier)
+        invoice = frappe.get_doc({
+            "doctype": "POS Invoice",
+            "company": company,
+            "customer": "BNPL Demo Customer",
+            "pos_profile": pos_profile,
+            "is_pos": 1,
+            "posting_date": frappe.utils.nowdate(),
+            "currency": "SAR",
+            "selling_price_list": "Standard Selling",
+            "disable_rounded_total": 1,
+            "taxes_and_charges": "VAT 15% - BOT - BS",
+            "remarks": f"Native POS Invoice test paid through {mode_of_payment}",
+            "items": [{"item_code": "POS Test Item", "qty": 1, "rate": 100.0}],
+            "payments": [{"mode_of_payment": mode_of_payment, "amount": 115.0}],
+        })
+        invoice.insert()
+        invoice.submit()
+
+        from erpnext.accounts.doctype.pos_closing_entry.pos_closing_entry import (
+            make_closing_entry_from_opening,
+        )
+
+        opening = frappe.get_doc("POS Opening Entry", opening_name)
+        closing = make_closing_entry_from_opening(opening)
+        for payment in closing.payment_reconciliation:
+            payment.closing_amount = payment.expected_amount
+        closing.submit()
+        invoice.reload()
+        return {
+            "pos_settings_invoice_type": frappe.db.get_single_value("POS Settings", "invoice_type"),
+            "pos_invoice": invoice.name,
+            "pos_closing_entry": closing.name,
+            "consolidated_sales_invoice": invoice.consolidated_invoice,
+            "grand_total": float(invoice.grand_total),
+            "mode_of_payment": mode_of_payment,
+        }
+    finally:
+        frappe.set_user(previous_user)
