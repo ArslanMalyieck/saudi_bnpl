@@ -65,11 +65,21 @@ Inputs: provider statement, inclusive settlement period, bank credit, and fee ta
    - Cr Clearing = Gross
 7. Finance reviews and submits the JE, then matches the single provider bank receipt in Bank Reconciliation. The app does not create a Payment Entry or submit the JE.
 
+Generated entries use the dedicated `BNPL-JV-.YYYY.-` naming series (for example, `BNPL-JV-2026-00001`). They also carry read-only links to the BNPL Settlement, Provider Account, and POS Profile, the inclusive period, and the provider statement reference. The user remark repeats the provider, statement reference, profile, and inclusive period so the accounting purpose remains visible in Journal Entry and General Ledger drill-downs. These fields are populated only on app-generated entries; ordinary Journal Entries retain their configured naming series and behavior.
+
 Both direct POS-created Sales Invoices and native POS Invoices are supported. Direct invoices must be submitted POS Sales Invoices and consolidated Sales Invoices are excluded. Native POS Invoices are eligible only after linkage to a submitted consolidated Sales Invoice. Amounts come from signed company-currency payment rows, not invoice grand total or outstanding amount, so mixed tenders, partial provider payments, and returns are represented correctly.
 
 ### Late Catch-up
 
 Fetching excludes payment rows claimed by another settlement. If an unclaimed invoice posts inside any earlier JE-linked interval for the same provider and POS Profile, it is marked Late Entry and remains selectable for a catch-up settlement. An empty range overlapping an earlier completed interval reports that the period appears already settled with no new invoices. This is period-based detection; document creation and modification timestamps are not treated as exact submission times.
+
+## BNPL Provider Ledger
+
+Accounts Managers can use the standard **BNPL Provider Ledger** Script Report for audit and reconciliation. Company and Provider Account are required; POS Profile, From Date, and To Date are optional. The report combines canonical submitted provider activity from direct POS-created Sales Invoices and consolidated native POS Invoice payment rows with BNPL Settlement activity. It includes unclaimed invoices and links to sources, GL vouchers, settlements, and Journal Entries.
+
+Sales increase the posted provider receivable as debits and returns reduce it as credits. A settlement credit reduces the posted running balance only after its Journal Entry is submitted. A draft JE remains visible as `Draft (Pending)` with its expected credit, but does not change the posted running balance or submitted-settlement summary. When From Date is supplied, prior posted activity is included in the opening calculation but omitted from the displayed rows; the closing posted balance therefore remains cumulative. Report summaries show source debits, return credits, submitted settlement credits, and the closing posted balance for the selected scope.
+
+General Ledger remains the accounting book of record and can be drilled through the linked Journal Entry; the provider report supplies the source-to-settlement audit trail. Current test/demo configurations may share `Cash - BS`, but that does not provide provider-level clearing segregation in General Ledger. Production must use one dedicated provider clearing account per provider so each provider balance can be independently reconciled and audited.
 
 ### Example
 
@@ -88,6 +98,7 @@ Draft JE:
 
 - BNPL Provider Account and BNPL Settlement: Accounts Manager (read/write/create)
 - Journal Entry creation requires user to have JE create permission
+- BNPL Provider Ledger: Accounts Manager only
 
 ## Demo And Tests
 

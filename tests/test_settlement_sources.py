@@ -29,18 +29,19 @@ class SourceTests(unittest.TestCase):
 
     def test_groups_multiple_rows_and_keeps_signed_return_amount(self):
         rows = [
-            SimpleNamespace(payment_row="pay-2", source_invoice="SI-1", source_doctype="Sales Invoice", posting_date="2026-11-01", posting_time="10:00:00", is_return=0, gl_voucher="SI-1", base_amount=15, base_change_amount=0, account_for_change_amount=None),
-            SimpleNamespace(payment_row="pay-1", source_invoice="SI-1", source_doctype="Sales Invoice", posting_date="2026-11-01", posting_time="10:00:00", is_return=0, gl_voucher="SI-1", base_amount=100, base_change_amount=0, account_for_change_amount=None),
-            SimpleNamespace(payment_row="return-1", source_invoice="SI-RET", source_doctype="Sales Invoice", posting_date="2026-11-02", posting_time="10:00:00", is_return=1, gl_voucher="SI-RET", base_amount=-15, base_change_amount=0, account_for_change_amount=None),
+            SimpleNamespace(payment_row="pay-2", source_invoice="SI-1", source_doctype="Sales Invoice", posting_date="2026-11-01", posting_time="10:00:00", is_return=0, gl_voucher="SI-1", pos_profile="Profile", base_amount=15, base_change_amount=0, account_for_change_amount=None),
+            SimpleNamespace(payment_row="pay-1", source_invoice="SI-1", source_doctype="Sales Invoice", posting_date="2026-11-01", posting_time="10:00:00", is_return=0, gl_voucher="SI-1", pos_profile="Profile", base_amount=100, base_change_amount=0, account_for_change_amount=None),
+            SimpleNamespace(payment_row="return-1", source_invoice="SI-RET", source_doctype="Sales Invoice", posting_date="2026-11-02", posting_time="10:00:00", is_return=1, gl_voucher="SI-RET", pos_profile="Profile", base_amount=-15, base_change_amount=0, account_for_change_amount=None),
         ]
         fake = SimpleNamespace(utils=SimpleNamespace(get_datetime=lambda value: datetime.fromisoformat(value)), throw=reject)
         with patch.object(module, "frappe", fake), patch.object(module, "_", lambda value: value):
             grouped = module._group_payment_rows(rows, "Clearing")
         self.assertEqual([float(row["provider_amount"]) for row in grouped], [115.0, -15.0])
         self.assertEqual(grouped[0]["payment_row_ids"], '["pay-1","pay-2"]')
+        self.assertEqual(grouped[0]["pos_profile"], "Profile")
 
     def test_rejects_change_posted_to_provider_account(self):
-        row = SimpleNamespace(payment_row="pay", source_invoice="SI-1", source_doctype="Sales Invoice", posting_date="2026-11-01", posting_time="10:00:00", is_return=0, gl_voucher="SI-1", base_amount=100, base_change_amount=5, account_for_change_amount="Clearing")
+        row = SimpleNamespace(payment_row="pay", source_invoice="SI-1", source_doctype="Sales Invoice", posting_date="2026-11-01", posting_time="10:00:00", is_return=0, gl_voucher="SI-1", pos_profile="Profile", base_amount=100, base_change_amount=5, account_for_change_amount="Clearing")
         with patch.object(module, "frappe", SimpleNamespace(throw=reject)), patch.object(module, "_", lambda value: value):
             with self.assertRaisesRegex(Rejected, "change posted"):
                 module._group_payment_rows([row], "Clearing")

@@ -13,6 +13,7 @@ from saudi_bnpl.financial import (
     stable_name,
     validate_amounts,
 )
+from saudi_bnpl.setup import BNPL_JOURNAL_SERIES, journal_entry_remark
 from saudi_bnpl.saudi_bnpl.doctype.bnpl_provider_account.bnpl_provider_account import account_details
 
 
@@ -41,33 +42,44 @@ def validate_period(company, pos_profile, from_date, to_date):
 
 
 def _query_payment_rows(company, pos_profile, provider, from_date, to_date):
-    values = (company, pos_profile, provider.mode_of_payment, provider.clearing_account, from_date, to_date)
-    sql = """
+    return _query_provider_payment_rows(company, provider, from_date, to_date, pos_profile)
+
+
+def _query_provider_payment_rows(company, provider, from_date, to_date, pos_profile=None):
+    profile_condition = " and {alias}.pos_profile = %s" if pos_profile else ""
+    values = [company, provider.mode_of_payment, provider.clearing_account]
+    if pos_profile:
+        values.append(pos_profile)
+    values.extend((from_date, to_date))
+    sql = f"""
         select p.name payment_row, p.parent source_invoice, 'Sales Invoice' source_doctype,
-            si.posting_date, si.posting_time, si.is_return, si.name gl_voucher,
+            si.posting_date, si.posting_time, si.is_return, si.name gl_voucher, si.pos_profile,
             p.base_amount, si.base_change_amount, si.account_for_change_amount
         from `tabSales Invoice Payment` p
         inner join `tabSales Invoice` si
             on si.name = p.parent and p.parenttype = 'Sales Invoice' and p.parentfield = 'payments'
-        where si.docstatus = 1 and si.company = %s and si.pos_profile = %s
+        where si.docstatus = 1 and si.company = %s
             and si.is_pos = 1 and ifnull(si.is_consolidated, 0) = 0
             and p.mode_of_payment = %s and p.account = %s
+            {profile_condition.format(alias='si')}
             and si.posting_date between %s and %s
         union all
         select p.name payment_row, p.parent source_invoice, 'POS Invoice' source_doctype,
             pi.posting_date, pi.posting_time, pi.is_return, pi.consolidated_invoice gl_voucher,
+            pi.pos_profile,
             p.base_amount, pi.base_change_amount, pi.account_for_change_amount
         from `tabSales Invoice Payment` p
         inner join `tabPOS Invoice` pi
             on pi.name = p.parent and p.parenttype = 'POS Invoice' and p.parentfield = 'payments'
         inner join `tabSales Invoice` consolidated
             on consolidated.name = pi.consolidated_invoice and consolidated.docstatus = 1
-        where pi.docstatus = 1 and pi.company = %s and pi.pos_profile = %s
+        where pi.docstatus = 1 and pi.company = %s
             and p.mode_of_payment = %s and p.account = %s
+            {profile_condition.format(alias='pi')}
             and pi.posting_date between %s and %s
         order by posting_date, posting_time, source_doctype, source_invoice, payment_row
     """
-    return frappe.db.sql(sql, values + values, as_dict=True)
+    return frappe.db.sql(sql, tuple(values + values), as_dict=True)
 
 
 def _posting_datetime(row):
@@ -87,6 +99,7 @@ def _group_payment_rows(rows, clearing_account):
             "posting_datetime": _posting_datetime(row),
             "is_return": int(row.is_return or 0),
             "gl_voucher": row.gl_voucher,
+            "pos_profile": row.pos_profile,
             "provider_amount": money(0),
             "payment_rows": [],
         })
@@ -381,7 +394,18 @@ def create_journal_entry(name):
             frappe.throw(_("Payment row {0} was concurrently claimed by settlement {1}.").format(claim["payment_row"], owner or _("another settlement")))
     journal = frappe.get_doc({
         "doctype": "Journal Entry", "voucher_type": "Journal Entry", "company": settlement.company,
-        "posting_date": settlement.payout_date, "user_remark": _("Draft prepared for BNPL statement {0}").format(settlement.name),
+        "naming_series": BNPL_JOURNAL_SERIES,
+        "posting_date": settlement.payout_date,
+        "user_remark": journal_entry_remark(
+            provider.provider_name, settlement.statement_reference, settlement.pos_profile,
+            settlement.from_date, settlement.to_date,
+        ),
+        "custom_bnpl_settlement": settlement.name,
+        "custom_bnpl_provider_account": settlement.provider_account,
+        "custom_bnpl_pos_profile": settlement.pos_profile,
+        "custom_bnpl_from_date": settlement.from_date,
+        "custom_bnpl_to_date": settlement.to_date,
+        "custom_bnpl_statement_reference": settlement.statement_reference,
         "accounts": accounts,
     })
     journal.insert()

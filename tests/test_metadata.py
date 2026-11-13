@@ -32,3 +32,12 @@ class MetadataTests(unittest.TestCase):
         settlement = json.loads((root / "bnpl_settlement" / "bnpl_settlement.json").read_text(encoding="utf-8"))
         table = next(field for field in settlement["fields"] if field["fieldname"] == "invoices")
         self.assertEqual(table["options"], "BNPL Settlement Invoice")
+
+    def test_provider_ledger_is_standard_and_accounts_manager_only(self):
+        path = (Path(__file__).resolve().parents[1] / "saudi_bnpl" / "saudi_bnpl" / "report"
+                / "bnpl_provider_ledger" / "bnpl_provider_ledger.json")
+        report = json.loads(path.read_text(encoding="utf-8"))
+        self.assertEqual(report["report_type"], "Script Report")
+        self.assertEqual(report["is_standard"], "Yes")
+        self.assertTrue(report["apply_user_permissions"])
+        self.assertEqual(report["roles"], [{"role": "Accounts Manager"}])

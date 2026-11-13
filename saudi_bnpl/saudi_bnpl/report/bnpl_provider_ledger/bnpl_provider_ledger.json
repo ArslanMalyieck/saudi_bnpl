@@ -1,0 +1,17 @@
+{
+ "add_total_row": 0,
+ "apply_user_permissions": 1,
+ "disabled": 0,
+ "doctype": "Report",
+ "is_standard": "Yes",
+ "module": "Saudi BNPL",
+ "name": "BNPL Provider Ledger",
+ "ref_doctype": "BNPL Settlement",
+ "report_name": "BNPL Provider Ledger",
+ "report_type": "Script Report",
+ "roles": [
+  {
+   "role": "Accounts Manager"
+  }
+ ]
+}

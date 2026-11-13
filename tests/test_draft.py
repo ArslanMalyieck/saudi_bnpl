@@ -16,10 +16,11 @@ def reject(message, *args):
 
 class DraftTests(unittest.TestCase):
     def setUp(self):
-        self.provider = MagicMock(enabled=1, bank_account="Bank", clearing_account="Clearing", supplier="Supplier")
+        self.provider = MagicMock(enabled=1, provider_name="Tamara", bank_account="Bank", clearing_account="Clearing", supplier="Supplier")
         self.settlement = MagicMock(name="statement", status="Open", journal_entry=None,
                                     provider_account="provider", company="Company", payout_date="2026-11-01",
-                                    gross=115, fee=10, vat=1.5, net=103.5)
+                                    pos_profile="Profile", from_date="2026-10-01", to_date="2026-10-31",
+                                    statement_reference="STMT-1", gross=115, fee=10, vat=1.5, net=103.5)
         self.settlement.name = "statement"
         self.settlement.flags = SimpleNamespace()
         self.invoice = SimpleNamespace(name="PI-1", credit_to="Payable")
@@ -63,6 +64,13 @@ class DraftTests(unittest.TestCase):
         self.settlement.validate_invoice.assert_called_once_with(self.provider, for_update=True)
         self.db.get_value.assert_called_once()
         self.assertIn((("BNPL Provider Account", "provider"), {"for_update": True}), self.loads)
+        self.assertEqual(self.payloads[0]["naming_series"], "BNPL-JV-.YYYY.-")
+        self.assertEqual(self.payloads[0]["custom_bnpl_settlement"], "statement")
+        self.assertEqual(self.payloads[0]["custom_bnpl_provider_account"], "provider")
+        self.assertEqual(self.payloads[0]["custom_bnpl_pos_profile"], "Profile")
+        self.assertEqual(self.payloads[0]["custom_bnpl_statement_reference"], "STMT-1")
+        self.assertIn("Tamara", self.payloads[0]["user_remark"])
+        self.assertIn("inclusive period 2026-10-01 to 2026-10-31", self.payloads[0]["user_remark"])
 
     def test_insert_defaults_are_not_overwritten(self):
         self.journal.insert.side_effect = lambda: setattr(self.journal, "cost_center", "Core Default")
