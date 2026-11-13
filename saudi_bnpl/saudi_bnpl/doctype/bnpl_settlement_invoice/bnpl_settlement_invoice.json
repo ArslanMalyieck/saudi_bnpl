@@ -1,0 +1,27 @@
+{
+ "actions": [],
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": ["selected", "source_doctype", "source_invoice", "posting_datetime", "is_return", "gl_voucher", "provider_amount", "payment_row_ids", "late_entry", "settlement_note"],
+ "fields": [
+  {"default": "1", "fieldname": "selected", "fieldtype": "Check", "in_list_view": 1, "label": "Selected"},
+  {"fieldname": "source_doctype", "fieldtype": "Link", "label": "Source Type", "options": "DocType", "read_only": 1, "reqd": 1},
+  {"fieldname": "source_invoice", "fieldtype": "Dynamic Link", "in_list_view": 1, "label": "Source Invoice", "options": "source_doctype", "read_only": 1, "reqd": 1},
+  {"fieldname": "posting_datetime", "fieldtype": "Datetime", "in_list_view": 1, "label": "Posting Date / Time", "read_only": 1, "reqd": 1},
+  {"default": "0", "fieldname": "is_return", "fieldtype": "Check", "label": "Return", "read_only": 1},
+  {"fieldname": "gl_voucher", "fieldtype": "Link", "label": "GL Sales Invoice", "options": "Sales Invoice", "read_only": 1, "reqd": 1},
+  {"fieldname": "provider_amount", "fieldtype": "Currency", "in_list_view": 1, "label": "Provider Amount (SAR)", "options": "Company:company:default_currency", "precision": "2", "read_only": 1, "reqd": 1},
+  {"fieldname": "payment_row_ids", "fieldtype": "Code", "hidden": 1, "label": "Payment Row IDs", "read_only": 1, "reqd": 1},
+  {"default": "0", "fieldname": "late_entry", "fieldtype": "Check", "in_list_view": 1, "label": "Late Entry", "read_only": 1},
+  {"fieldname": "settlement_note", "fieldtype": "Small Text", "label": "Settlement Note"}
+ ],
+ "istable": 1,
+ "links": [],
+ "module": "Saudi BNPL",
+ "name": "BNPL Settlement Invoice",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "ASC",
+ "states": []
+}

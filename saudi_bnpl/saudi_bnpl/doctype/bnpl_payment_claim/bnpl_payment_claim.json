@@ -1,0 +1,22 @@
+{
+ "actions": [],
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": ["settlement", "provider_account", "source_doctype", "source_invoice", "payment_row", "provider_amount"],
+ "fields": [
+  {"fieldname": "settlement", "fieldtype": "Link", "label": "Settlement", "options": "BNPL Settlement", "read_only": 1, "reqd": 1, "search_index": 1},
+  {"fieldname": "provider_account", "fieldtype": "Link", "label": "Provider Account", "options": "BNPL Provider Account", "read_only": 1, "reqd": 1, "search_index": 1},
+  {"fieldname": "source_doctype", "fieldtype": "Link", "label": "Source Type", "options": "DocType", "read_only": 1, "reqd": 1},
+  {"fieldname": "source_invoice", "fieldtype": "Dynamic Link", "label": "Source Invoice", "options": "source_doctype", "read_only": 1, "reqd": 1},
+  {"fieldname": "payment_row", "fieldtype": "Data", "label": "Sales Invoice Payment Row", "read_only": 1, "reqd": 1, "search_index": 1, "unique": 1},
+  {"fieldname": "provider_amount", "fieldtype": "Currency", "label": "Provider Amount (SAR)", "options": "Company:company:default_currency", "precision": "2", "read_only": 1, "reqd": 1}
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "module": "Saudi BNPL",
+ "name": "BNPL Payment Claim",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

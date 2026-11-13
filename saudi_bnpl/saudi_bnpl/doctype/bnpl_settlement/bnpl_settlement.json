@@ -1,25 +1,193 @@
 {
- "doctype":"DocType", "name":"BNPL Settlement", "module":"Saudi BNPL", "engine":"InnoDB",
- "creation":"2026-11-12 00:00:00.000000", "modified":"2026-11-12 00:00:00.000000", "modified_by":"Administrator", "owner":"Administrator",
- "is_submittable":0, "track_changes":1, "sort_field":"modified", "sort_order":"DESC",
- "field_order":["provider_account","company","statement_reference","status","payout_date","gross","fee","vat","net","tax_invoice","vat_account","statement_attachment","notes","journal_entry"],
- "fields":[
-  {"fieldname":"provider_account","fieldtype":"Link","label":"Provider Account","options":"BNPL Provider Account","reqd":1,"in_list_view":1,"set_only_once":1,"search_index":1},
-  {"fieldname":"company","fieldtype":"Link","label":"Company","options":"Company","reqd":1,"in_list_view":1,"set_only_once":1},
-  {"fieldname":"statement_reference","fieldtype":"Data","label":"Provider Statement Reference","reqd":1,"in_list_view":1,"set_only_once":1,"description":"Pilot only: finance must independently verify the statement, POS clearing balance and payout. No provider or invoice matching is performed."},
-  {"fieldname":"status","fieldtype":"Select","label":"Operational Status","options":"Open\nClosed","default":"Open","reqd":1,"in_list_view":1,"description":"Closing is administrative only; it does not post or cancel anything."},
-  {"fieldname":"payout_date","fieldtype":"Date","label":"Payout Date","reqd":1},
-  {"fieldname":"gross","fieldtype":"Currency","label":"Gross (SAR)","options":"Company:company:default_currency","precision":"2","reqd":1},
-  {"fieldname":"fee","fieldtype":"Currency","label":"Commission (SAR)","options":"Company:company:default_currency","precision":"2","default":"0"},
-  {"fieldname":"vat","fieldtype":"Currency","label":"VAT (SAR)","options":"Company:company:default_currency","precision":"2","default":"0"},
-  {"fieldname":"net","fieldtype":"Currency","label":"Net Payout (SAR)","options":"Company:company:default_currency","precision":"2","reqd":1},
-  {"fieldname":"tax_invoice","fieldtype":"Link","label":"Submitted Provider Fee Purchase Invoice","options":"Purchase Invoice","search_index":1},
-  {"fieldname":"vat_account","fieldtype":"Link","label":"Fee Invoice VAT Account","options":"Account","description":"Finance selects the account used by all VAT rows on the fee invoice."},
-  {"fieldname":"statement_attachment","fieldtype":"Attach","label":"Provider Statement Attachment"},
-  {"fieldname":"notes","fieldtype":"Small Text","label":"Notes"},
-  {"fieldname":"journal_entry","fieldtype":"Link","label":"Generated Journal Entry","options":"Journal Entry","read_only":1,"no_copy":1}
+ "actions": [],
+ "creation": "2026-11-12 12:32:35.219698",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "provider_account",
+  "company",
+  "pos_profile",
+  "from_date",
+  "to_date",
+  "statement_reference",
+  "status",
+  "payout_date",
+  "late_warning",
+  "invoices",
+  "gross",
+  "fee",
+  "vat",
+  "net",
+  "tax_invoice",
+  "vat_account",
+  "statement_attachment",
+  "notes",
+  "journal_entry"
  ],
- "permissions":[
-  {"role":"Accounts Manager","read":1,"write":1,"create":1,"report":1}
- ]
+ "fields": [
+  {
+   "fieldname": "provider_account",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Provider Account",
+   "options": "BNPL Provider Account",
+   "reqd": 1,
+   "search_index": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1,
+   "read_only": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "pos_profile",
+   "fieldtype": "Link",
+   "label": "POS Profile",
+   "options": "POS Profile",
+   "search_index": 1
+  },
+  {
+   "description": "Inclusive invoice posting date.",
+   "fieldname": "from_date",
+   "fieldtype": "Date",
+   "label": "From Date"
+  },
+  {
+   "description": "Inclusive invoice posting date.",
+   "fieldname": "to_date",
+   "fieldtype": "Date",
+   "label": "To Date"
+  },
+  {
+   "description": "Unique provider statement reference. Finance must still verify the statement, selected invoices, clearing balance and bank payout.",
+   "fieldname": "statement_reference",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Provider Statement Reference",
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "default": "Open",
+   "description": "Closing is administrative only; it does not post or cancel anything.",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Operational Status",
+   "options": "Open\nClosed",
+   "reqd": 1
+  },
+  {
+   "fieldname": "payout_date",
+   "fieldtype": "Date",
+   "label": "Payout Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "late_warning",
+   "fieldtype": "Small Text",
+   "label": "Late / Unsettled Warning",
+   "read_only": 1
+  },
+  {
+   "fieldname": "invoices",
+   "fieldtype": "Table",
+   "label": "Provider Invoices",
+   "options": "BNPL Settlement Invoice"
+  },
+  {
+   "fieldname": "gross",
+   "fieldtype": "Currency",
+   "label": "Gross (SAR)",
+   "options": "Company:company:default_currency",
+   "precision": "2",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "fee",
+   "fieldtype": "Currency",
+   "label": "Commission (SAR)",
+   "options": "Company:company:default_currency",
+   "precision": "2"
+  },
+  {
+   "default": "0",
+   "fieldname": "vat",
+   "fieldtype": "Currency",
+   "label": "VAT (SAR)",
+   "options": "Company:company:default_currency",
+   "precision": "2"
+  },
+  {
+   "fieldname": "net",
+   "fieldtype": "Currency",
+   "label": "Net Payout (SAR)",
+   "options": "Company:company:default_currency",
+   "precision": "2",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "tax_invoice",
+   "fieldtype": "Link",
+   "label": "Submitted Provider Fee Purchase Invoice",
+   "options": "Purchase Invoice",
+   "search_index": 1
+  },
+  {
+   "description": "Finance selects the account used by all VAT rows on the fee invoice.",
+   "fieldname": "vat_account",
+   "fieldtype": "Link",
+   "label": "Fee Invoice VAT Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "statement_attachment",
+   "fieldtype": "Attach",
+   "label": "Provider Statement Attachment"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "journal_entry",
+   "fieldtype": "Link",
+   "label": "Generated Journal Entry",
+   "no_copy": 1,
+   "options": "Journal Entry",
+   "read_only": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-11-13 12:15:53.826811",
+ "modified_by": "Administrator",
+ "module": "Saudi BNPL",
+ "name": "BNPL Settlement",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+    "delete": 0,
+   "read": 1,
+   "report": 1,
+   "role": "Accounts Manager",
+   "select": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
 }

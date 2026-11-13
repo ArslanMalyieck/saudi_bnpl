@@ -67,7 +67,7 @@ def _ensure_supplier(name: str):
 
 def run(provider: str = "Tabby", company: str | None = None, *,
         clearing_account: str | None = None, bank_account: str | None = None, vat_account: str | None = None):
-    """Create a minimal BNPL demo: provider config, fee PI, statement, and draft JE.
+    """Create a direct POS invoice and exercise the invoice-level BNPL demo workflow.
 
     Preconditions: an ERPNext company with a Cash account (clearing), a Bank account (payout)
     and at least one VAT Tax account exist. Uses SAR. Designed for a local test site.
@@ -78,93 +78,10 @@ def run(provider: str = "Tabby", company: str | None = None, *,
     if not company:
         raise RuntimeError("No Company found. Create a Company first.")
 
-    # Accounts
-    clearing = clearing_account or _find_account(company, "Cash")
-    bank = bank_account or _find_account(company, "Bank")
-    vat_account = vat_account or _first("Account", {"company": company, "account_type": "Tax", "is_group": 0})
-    if not clearing or not bank:
-        raise RuntimeError("Could not find required accounts: Cash (clearing) and Bank (payout).")
-    if not vat_account:
-        raise RuntimeError("Could not find a leaf Tax account for VAT. Configure a VAT account and retry.")
-
-    # Mode of Payment and Supplier
-    mop = _ensure_mop(f"BNPL {provider}", company, clearing)
-    supplier = _ensure_supplier(f"BNPL {provider} Supplier")
-
-    # Provider config
-    pconf = frappe.db.exists("BNPL Provider Account", {"provider_name": provider, "company": company})
-    if not pconf:
-        doc = frappe.get_doc({
-            "doctype": "BNPL Provider Account",
-            "provider_name": provider,
-            "company": company,
-            "enabled": 1,
-            "mode_of_payment": mop,
-            "clearing_account": clearing,
-            "bank_account": bank,
-            "supplier": supplier,
-        })
-        doc.insert()
-        pconf = doc.name
-
-    # Fee Purchase Invoice (50 + 7.5 VAT)
-    item = _ensure_item("BNPL Fee")
-    today = _dt.date.today()
-    pi = frappe.get_doc({
-        "doctype": "Purchase Invoice",
-        "company": company,
-        "supplier": supplier,
-        "posting_date": today,
-        "currency": "SAR",
-        "description": "BNPL Fee",
-        "bill_no": f"{provider.upper()}-TEST-001",
-        "items": [{"item_code": item, "qty": 1, "rate": 50.0, "description": "BNPL Fee"}],
-        "taxes": [{
-            "charge_type": "On Net Total",
-            "add_deduct_tax": "Add",
-            "category": "Total",
-            "account_head": vat_account,
-            "description": "VAT 15%",
-            "rate": 15.0,
-        }],
-    })
-    pi.insert()
-    pi.submit()
-
-    # Statement: 1000 gross, 50 fee, 7.5 VAT, 942.5 net
-    stmt = frappe.get_doc({
-        "doctype": "BNPL Settlement",
-        "provider_account": pconf,
-        "company": company,
-        "statement_reference": f"{provider.upper()}-TEST-001",
-        "status": "Open",
-        "payout_date": today,
-        "gross": 1000.0,
-        "fee": 50.0,
-        "vat": 7.5,
-        "net": 942.5,
-        "tax_invoice": pi.name,
-        "vat_account": vat_account,
-    })
-    stmt.insert()
-
-    # Generate draft Journal Entry
-    from saudi_bnpl.saudi_bnpl.doctype.bnpl_settlement.bnpl_settlement import create_journal_entry
-
-    je = create_journal_entry(stmt.name)
-
-    return {
-        "company": company,
-        "provider_config": pconf,
-        "supplier": supplier,
-        "mode_of_payment": mop,
-        "clearing_account": clearing,
-        "bank_account": bank,
-        "vat_account": vat_account,
-        "purchase_invoice": pi.name,
-        "settlement": stmt.name,
-        "journal_entry": je,
-    }
+    return pos_via_provider_scenario(
+        company, provider, clearing_account=clearing_account,
+        bank_account=bank_account, vat_account=vat_account,
+    )
 
 
 def run_quick():
@@ -276,19 +193,31 @@ def probe_invoice(name: str):
 
 def create_settlement(company: str, provider_config: str, tax_invoice: str, vat_account: str):
     today = _dt.date.today()
+    pos_profile = _first("POS Profile", {"company": company, "disabled": 0})
+    if not pos_profile:
+        raise RuntimeError("An enabled POS Profile is required")
+    from saudi_bnpl.saudi_bnpl.doctype.bnpl_settlement.bnpl_settlement import fetch_provider_invoices
+    fetched = fetch_provider_invoices(provider_config, company, pos_profile, today, today)
+    invoice = frappe.get_doc("Purchase Invoice", tax_invoice)
+    fee = float(invoice.net_total)
+    vat = float(invoice.total_taxes_and_charges)
     stmt = frappe.get_doc({
         "doctype": "BNPL Settlement",
         "provider_account": provider_config,
         "company": company,
+        "pos_profile": pos_profile,
+        "from_date": today,
+        "to_date": today,
         "statement_reference": "TABBY-TEST-001",
         "status": "Open",
         "payout_date": today,
-        "gross": 1000.0,
-        "fee": 50.0,
-        "vat": 7.5,
-        "net": 942.5,
+        "gross": fetched["gross"],
+        "fee": fee,
+        "vat": vat,
+        "net": round(fetched["gross"] - fee - vat, 2),
         "tax_invoice": tax_invoice,
         "vat_account": vat_account,
+        "invoices": fetched["rows"],
     })
     stmt.insert()
     from saudi_bnpl.saudi_bnpl.doctype.bnpl_settlement.bnpl_settlement import create_journal_entry
@@ -324,7 +253,7 @@ def _find_cost_center(company: str):
     return _first("Cost Center", {"company": company, "is_group": 0})
 
 
-def pos_via_provider_scenario(company: str, provider: str = "Tamara"):
+def pos_via_provider_scenario(company: str, provider: str = "Tamara", *, clearing_account=None, bank_account=None, vat_account=None):
     """Create a POS-style Sales Invoice paid via BNPL provider, then receive payout via settlement.
 
     Flow:
@@ -335,11 +264,14 @@ def pos_via_provider_scenario(company: str, provider: str = "Tamara"):
     - Create BNPL Settlement (gross from SI grand_total) and generate Draft JE
     Returns identifiers and the resulting JE account splits.
     """
-    cash = _find_account(company, "Cash")
-    bank = _find_account(company, "Bank")
-    vat_account = _first("Account", {"company": company, "account_type": "Tax", "is_group": 0})
+    cash = clearing_account or _find_account(company, "Cash")
+    bank = bank_account or _find_account(company, "Bank")
+    vat_account = vat_account or _first("Account", {"company": company, "account_type": "Tax", "is_group": 0})
     if not (cash and bank and vat_account):
         raise RuntimeError("Required accounts not found (Cash, Bank, Tax)")
+    pos_profile = _first("POS Profile", {"company": company, "disabled": 0})
+    if not pos_profile:
+        raise RuntimeError("An enabled POS Profile is required for the invoice-level settlement demo")
 
     # Ensure MoP and Provider config
     conf = create_provider(company, provider, cash, bank)
@@ -369,6 +301,7 @@ def pos_via_provider_scenario(company: str, provider: str = "Tamara"):
     si = frappe.get_doc({
         "doctype": "Sales Invoice",
         "company": company,
+        "pos_profile": pos_profile,
         "customer": "BNPL Demo Customer",
         "is_pos": 1,
         "disable_rounded_total": 1,
@@ -392,9 +325,11 @@ def pos_via_provider_scenario(company: str, provider: str = "Tamara"):
     # Provider fee PI 10 + 1.5 VAT
     pi = create_fee_invoice(company, provider, vat_account, bill_suffix="POS001", fee=10.0)
 
-    # Settlement: gross from SI, fee 10, VAT 1.5, net = grand_total - fee - VAT
-    si_doc = frappe.get_doc("Sales Invoice", si.name)
-    gross = float(si_doc.grand_total)
+    # Fetch the signed provider payment rows; mixed tender means invoice total is not authoritative.
+    from saudi_bnpl.saudi_bnpl.doctype.bnpl_settlement.bnpl_settlement import fetch_provider_invoices
+    fetched = fetch_provider_invoices(provider_account=conf["provider_config"], company=company,
+        pos_profile=pos_profile, from_date=_dt.date.today(), to_date=_dt.date.today())
+    gross = float(fetched["gross"])
     fee = 10.0
     # read VAT from PI to avoid template drift
     pi_doc = frappe.get_doc("Purchase Invoice", pi)
@@ -407,6 +342,9 @@ def pos_via_provider_scenario(company: str, provider: str = "Tamara"):
         "doctype": "BNPL Settlement",
         "provider_account": provider_config,
         "company": company,
+        "pos_profile": pos_profile,
+        "from_date": _dt.date.today(),
+        "to_date": _dt.date.today(),
         "statement_reference": f"{provider.upper()}-POS-001",
         "status": "Open",
         "payout_date": _dt.date.today(),
@@ -416,6 +354,7 @@ def pos_via_provider_scenario(company: str, provider: str = "Tamara"):
         "net": net,
         "tax_invoice": pi,
         "vat_account": vat_account,
+        "invoices": fetched["rows"],
     })
     new_stmt.insert()
     from saudi_bnpl.saudi_bnpl.doctype.bnpl_settlement.bnpl_settlement import create_journal_entry as _cje

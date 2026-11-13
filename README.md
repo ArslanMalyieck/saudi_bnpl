@@ -51,21 +51,25 @@ Goal: customer balance zero at sale time; clearing accumulates provider gross.
 
 ## Settlement Flow (at payout time)
 
-Inputs: provider statement (gross, fee, VAT, net), bank credit, fee tax invoice.
+Inputs: provider statement, inclusive settlement period, bank credit, and fee tax invoice.
 
 1. Record the provider fee Purchase Invoice (Supplier = provider supplier) for fee and VAT.
    - SAR only; fully outstanding; one set of additive VAT rows on the selected VAT account; no advances/write-off/rounding drift.
-2. Create BNPL Settlement with:
-   - Provider Account, Company
-   - Statement Reference (unique per provider/company)
-   - Payout Date
-   - Gross, Fee, VAT, Net (SAR, 2 decimals; gross = net + fee + VAT)
-   - Fee Purchase Invoice and VAT Account (if fee > 0)
-3. Click Create Draft Journal Entry. The app creates draft JE:
+2. Create BNPL Settlement and select the Provider Account. Company is filled from the permanent provider configuration.
+3. Select the POS Profile, inclusive From Date and To Date, statement reference, and payout date.
+4. Click Fetch Provider Invoices. The app finds unclaimed submitted provider payment rows, groups multiple matching payment rows per source invoice, and derives signed gross from selected rows. Deselect rows that are not on the provider statement.
+5. Enter fee and VAT. Net is derived as gross minus fee minus VAT. Select the submitted fee Purchase Invoice and VAT account when a fee applies.
+6. Save, then click Create Draft Journal Entry. The app atomically reserves each selected payment row and creates one draft JE:
    - Dr Bank = Net
    - Dr Supplier Payable = Fee + VAT (with PI reference)
    - Cr Clearing = Gross
-4. Finance reviews and submits the JE, then matches bank credit in Bank Reconciliation.
+7. Finance reviews and submits the JE, then matches the single provider bank receipt in Bank Reconciliation. The app does not create a Payment Entry or submit the JE.
+
+Both direct POS-created Sales Invoices and native POS Invoices are supported. Direct invoices must be submitted POS Sales Invoices and consolidated Sales Invoices are excluded. Native POS Invoices are eligible only after linkage to a submitted consolidated Sales Invoice. Amounts come from signed company-currency payment rows, not invoice grand total or outstanding amount, so mixed tenders, partial provider payments, and returns are represented correctly.
+
+### Late Catch-up
+
+Fetching excludes payment rows claimed by another settlement. If an unclaimed invoice posts inside any earlier JE-linked interval for the same provider and POS Profile, it is marked Late Entry and remains selectable for a catch-up settlement. An empty range overlapping an earlier completed interval reports that the period appears already settled with no new invoices. This is period-based detection; document creation and modification timestamps are not treated as exact submission times.
 
 ### Example
 
@@ -106,14 +110,14 @@ cd apps/saudi_bnpl
 PYTHONDONTWRITEBYTECODE=1 /path/to/bench/env/bin/python -m unittest discover -s tests -v
 ```
 
-Tests validate hashing, amounts, provider config rules, and draft creation logic, but do not exercise real GL posting, scheduler, SQL lock behavior, or browser flows.
+Tests validate hashing, signed amount grouping, claims, duplicate prevention, late detection, provider config rules, metadata, and draft creation logic, but do not exercise real GL posting, scheduler, concurrent SQL transactions, or browser flows.
 
 ## Limitations (Important)
 
-- No provider API integration, payout detection, invoice matching, or refunds handling
+- No provider API integration or automatic payout detection; finance must match the provider statement and bank receipt
 - SAR only; no foreign currency
 - Fee invoice must exactly equal fee and VAT; no partial/complex terms
-- Concurrency protection is best-effort; finance must review before submission
+- Deterministic payment-row claims prevent duplicate settlement; finance must still review the draft before submission
 - Company rename unsupported (document names are hash-based)
 
 ## Uninstall

@@ -19,3 +19,16 @@ class MetadataTests(unittest.TestCase):
                     field = next(f for f in data["fields"] if f["fieldname"] == "provider_name")
                     self.assertEqual(field["fieldtype"], "Select")
                     self.assertEqual(field["options"].splitlines(), ["", "Tabby", "Tamara", "Emkan", "NEO", "Madfu"])
+
+    def test_internal_invoice_and_claim_doctypes(self):
+        root = Path(__file__).resolve().parents[1] / "saudi_bnpl" / "saudi_bnpl" / "doctype"
+        child = json.loads((root / "bnpl_settlement_invoice" / "bnpl_settlement_invoice.json").read_text(encoding="utf-8"))
+        claim = json.loads((root / "bnpl_payment_claim" / "bnpl_payment_claim.json").read_text(encoding="utf-8"))
+        self.assertTrue(child["istable"])
+        self.assertEqual(child["permissions"], [])
+        self.assertEqual(claim["permissions"], [])
+        payment_row = next(field for field in claim["fields"] if field["fieldname"] == "payment_row")
+        self.assertTrue(payment_row["unique"])
+        settlement = json.loads((root / "bnpl_settlement" / "bnpl_settlement.json").read_text(encoding="utf-8"))
+        table = next(field for field in settlement["fields"] if field["fieldname"] == "invoices")
+        self.assertEqual(table["options"], "BNPL Settlement Invoice")

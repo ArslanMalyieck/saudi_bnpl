@@ -33,6 +33,7 @@ class DraftTests(unittest.TestCase):
         self.frappe = SimpleNamespace(get_doc=self.get_doc, has_permission=MagicMock(return_value=True),
                                       db=self.db, throw=reject, PermissionError=PermissionError)
         self.patches = [patch.object(module, "frappe", self.frappe), patch.object(module, "_", lambda x: x)]
+        self.patches.append(patch.object(module, "_revalidate_selected_rows", return_value=[]))
         for p in self.patches:
             p.start()
             self.addCleanup(p.stop)

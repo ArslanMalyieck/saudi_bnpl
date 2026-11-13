@@ -1,7 +1,7 @@
 import unittest
 from decimal import Decimal
 
-from saudi_bnpl.financial import money, stable_name, validate_amounts
+from saudi_bnpl.financial import payment_claim_name, payment_row_ids, selected_amount, selection_hash, money, stable_name, validate_amounts
 
 
 class FinancialTests(unittest.TestCase):
@@ -15,6 +15,18 @@ class FinancialTests(unittest.TestCase):
                        (100, -1, 0, 101), (100, 0, 1, 99), (100, 1, 0, 99.001)]:
             with self.subTest(values=values), self.assertRaises(ValueError):
                 validate_amounts(*values)
+
+    def test_payment_row_normalization_hash_and_signed_sum(self):
+        rows = [
+            {"selected": 1, "payment_row_ids": '["row-b","row-a"]', "provider_amount": "115.00"},
+            {"selected": 1, "payment_row_ids": '["return-row"]', "provider_amount": "-15.00"},
+            {"selected": 0, "payment_row_ids": '["ignored"]', "provider_amount": "99.00"},
+        ]
+        self.assertEqual(payment_row_ids(rows[0]["payment_row_ids"]), ("row-a", "row-b"))
+        self.assertEqual(selected_amount(rows), Decimal("100.00"))
+        self.assertEqual(selection_hash(rows), selection_hash(list(reversed(rows))))
+        self.assertEqual(payment_claim_name("row-a"), payment_claim_name("row-a"))
+        self.assertNotEqual(payment_claim_name("row-a"), payment_claim_name("row-b"))
         for value in ("NaN", "Infinity", "1.001", "bad"):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 money(value)

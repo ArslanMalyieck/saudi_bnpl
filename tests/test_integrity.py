@@ -29,8 +29,9 @@ class IntegrityTests(unittest.TestCase):
         self.provider = SimpleNamespace(provider_name="Provider", company="Company", check_permission=MagicMock())
         data = dict(name=stable_name("BNPL-S-", "Company", "Provider", "Ref"), company="Company",
                     provider_account="Provider config", statement_reference="Ref", status="Open",
-                    gross=Decimal("115.00"), fee=Decimal("10.00"), vat=Decimal("1.50"), net=Decimal("103.50"),
-                    tax_invoice="PI-1", vat_account="VAT", journal_entry="JE-1", payout_date=date(2026, 11, 1))
+                     gross=Decimal("115.00"), fee=Decimal("10.00"), vat=Decimal("1.50"), net=Decimal("103.50"),
+                     tax_invoice="PI-1", vat_account="VAT", journal_entry="JE-1", payout_date=date(2026, 11, 1),
+                     pos_profile=None, from_date=None, to_date=None, invoices=[])
         self.previous = FakeDoc(**data)
         self.doc = FakeDoc(**data, previous=self.previous, flags={})
         self.doc.payout_date = "2026-11-01"
