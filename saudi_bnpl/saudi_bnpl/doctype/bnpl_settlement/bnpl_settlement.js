@@ -12,11 +12,50 @@ function can_fetch(frm) {
         && frm.doc.from_date && frm.doc.to_date;
 }
 
+function apply_provider_profile(frm, provider) {
+    const rows = (provider.profiles || []).filter(row => row.enabled && row.pos_profile);
+    const row = rows.find(item => item.pos_profile === frm.doc.pos_profile);
+    if (row) {
+        frm.set_value("mode_of_payment", row.mode_of_payment || provider.mode_of_payment);
+        frm.set_value("clearing_account", row.clearing_account || provider.clearing_account);
+        frm.set_value("bank_account", row.bank_account || provider.bank_account);
+    } else if (!rows.length) {
+        frm.set_value("mode_of_payment", provider.mode_of_payment);
+        frm.set_value("clearing_account", provider.clearing_account);
+        frm.set_value("bank_account", provider.bank_account);
+    }
+}
+
+function load_provider(frm) {
+    if (!frm.doc.provider_account) {
+        frm.set_query("pos_profile", () => ({filters: {company: frm.doc.company}}));
+        return;
+    }
+    frappe.db.get_doc("BNPL Provider Account", frm.doc.provider_account).then(provider => {
+        frm.__bnpl_provider_doc = provider;
+        const allowed = (provider.profiles || [])
+            .filter(row => row.enabled && row.pos_profile)
+            .map(row => row.pos_profile);
+        frm.set_query("pos_profile", () => (
+            allowed.length ? {filters: {name: ["in", allowed]}} : {filters: {company: frm.doc.company}}
+        ));
+        if (allowed.length === 1 && !frm.doc.pos_profile) {
+            frm.set_value("pos_profile", allowed[0]);
+        } else if (allowed.length > 1 && frm.doc.pos_profile && !allowed.includes(frm.doc.pos_profile)) {
+            frm.set_value("pos_profile", null);
+        }
+        apply_provider_profile(frm, provider);
+    }).catch(() => {
+        frm.set_query("pos_profile", () => ({filters: {company: frm.doc.company}}));
+    });
+}
+
 frappe.ui.form.on("BNPL Settlement", {
     setup(frm) {
-        frm.set_query("pos_profile", () => ({filters: {company: frm.doc.company}}));
+        load_provider(frm);
     },
     refresh(frm) {
+        load_provider(frm);
         frm.set_df_property("invoices", "read_only", Boolean(frm.doc.journal_entry));
         if (frm.doc.journal_entry) {
             frm.dashboard.set_headline(__("Journal Entry {0} is linked. Invoice selections and accounting details are locked; verify the JE's actual status in ERPNext.", [frm.doc.journal_entry]));
@@ -72,10 +111,18 @@ frappe.ui.form.on("BNPL Settlement", {
         }
     },
     provider_account(frm) {
-        if (!frm.doc.provider_account || !frm.is_new()) return;
+        if (!frm.doc.provider_account) return;
         frappe.db.get_value("BNPL Provider Account", frm.doc.provider_account, "company", r => {
-            if (r && r.company) frm.set_value("company", r.company);
+            if (r && r.company && frm.is_new()) frm.set_value("company", r.company);
+            load_provider(frm);
         });
+    },
+    pos_profile(frm) {
+        if (frm.__bnpl_provider_doc) {
+            apply_provider_profile(frm, frm.__bnpl_provider_doc);
+        } else {
+            load_provider(frm);
+        }
     },
     fee: recalculate_settlement,
     vat: recalculate_settlement,

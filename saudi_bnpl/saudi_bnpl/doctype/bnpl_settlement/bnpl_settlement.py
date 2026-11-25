@@ -30,6 +30,32 @@ def get_provider(name):
     return provider
 
 
+def _profile_value(row, fieldname):
+    return row.get(fieldname) if hasattr(row, "get") else getattr(row, fieldname, None)
+
+
+def configure_provider_for_profile(provider, pos_profile):
+    """Use the selected POS Profile row's accounts when available.
+
+    Older provider accounts have no profile rows; they keep using the
+    provider-level defaults. New accounts can share one provider name across
+    many POS Profiles with different payment/clearing/bank accounts.
+    """
+    if not pos_profile:
+        return provider
+    profiles = provider.get("profiles") if hasattr(provider, "get") else getattr(provider, "profiles", None)
+    rows = [row for row in (profiles or []) if _profile_value(row, "enabled")]
+    if not rows:
+        return provider
+    row = next((item for item in rows if _profile_value(item, "pos_profile") == pos_profile), None)
+    if not row:
+        frappe.throw(_("POS Profile {0} is not configured for this provider account.").format(pos_profile))
+    provider.mode_of_payment = _profile_value(row, "mode_of_payment") or getattr(provider, "mode_of_payment", None)
+    provider.clearing_account = _profile_value(row, "clearing_account") or getattr(provider, "clearing_account", None)
+    provider.bank_account = _profile_value(row, "bank_account") or getattr(provider, "bank_account", None)
+    return provider
+
+
 def validate_period(company, pos_profile, from_date, to_date):
     if not pos_profile or not from_date or not to_date:
         frappe.throw(_("POS Profile, From Date and To Date are required."))
@@ -143,6 +169,10 @@ class BNPLSettlement(Document):
 
     def validate(self):
         provider = get_provider(self.provider_account)
+        configure_provider_for_profile(provider, self.pos_profile)
+        self.mode_of_payment = getattr(provider, "mode_of_payment", None)
+        self.clearing_account = getattr(provider, "clearing_account", None)
+        self.bank_account = getattr(provider, "bank_account", None)
         legacy_linked = bool(self.journal_entry and not self.get("invoices"))
         try:
             expected = stable_name("BNPL-S-", self.company, provider.provider_name, self.statement_reference)
@@ -269,6 +299,7 @@ def _existing_row_map(existing_rows, settlement=None):
 @frappe.whitelist(methods=["POST"])
 def fetch_provider_invoices(provider_account, company, pos_profile, from_date, to_date, settlement_name=None, existing_rows=None):
     provider = get_provider(provider_account)
+    configure_provider_for_profile(provider, pos_profile)
     if not provider.enabled:
         frappe.throw(_("Provider configuration is disabled."))
     provider.validate()
@@ -326,6 +357,7 @@ def fetch_provider_invoices(provider_account, company, pos_profile, from_date, t
 
 
 def _revalidate_selected_rows(settlement, provider):
+    configure_provider_for_profile(provider, settlement.pos_profile)
     start, end = validate_period(settlement.company, settlement.pos_profile, settlement.from_date, settlement.to_date)
     selected = [row for row in settlement.invoices if row.selected]
     if not selected:
@@ -368,6 +400,7 @@ def create_journal_entry(name):
     if not frappe.has_permission("Journal Entry", "create"):
         frappe.throw(_("You need permission to create Journal Entries."), frappe.PermissionError)
     provider = get_provider(settlement.provider_account)
+    configure_provider_for_profile(provider, settlement.pos_profile)
     if not provider.enabled:
         frappe.throw(_("Provider configuration is disabled."))
     provider.validate()

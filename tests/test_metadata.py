@@ -41,3 +41,23 @@ class MetadataTests(unittest.TestCase):
         self.assertEqual(report["is_standard"], "Yes")
         self.assertTrue(report["apply_user_permissions"])
         self.assertEqual(report["roles"], [{"role": "Accounts Manager"}])
+
+    def test_provider_profiles_and_api_credentials_are_supported(self):
+        root = Path(__file__).resolve().parents[1] / "saudi_bnpl" / "saudi_bnpl" / "doctype"
+        provider = json.loads((root / "bnpl_provider_account" / "bnpl_provider_account.json").read_text(encoding="utf-8"))
+        profile = json.loads((root / "bnpl_provider_profile" / "bnpl_provider_profile.json").read_text(encoding="utf-8"))
+        settlement = json.loads((root / "bnpl_settlement" / "bnpl_settlement.json").read_text(encoding="utf-8"))
+        fields = {field["fieldname"]: field for field in provider["fields"]}
+        self.assertEqual(fields["profiles"]["fieldtype"], "Table")
+        self.assertEqual(fields["profiles"]["options"], "BNPL Provider Profile")
+        self.assertIn("api_key", fields)
+        self.assertIn("api_secret", fields)
+        self.assertTrue(profile["istable"])
+        self.assertEqual(profile["permissions"], [])
+        profile_fields = {field["fieldname"]: field for field in profile["fields"]}
+        self.assertEqual(profile_fields["pos_profile"]["options"], "POS Profile")
+        self.assertEqual(profile_fields["mode_of_payment"]["options"], "Mode of Payment")
+        self.assertEqual(profile_fields["clearing_account"]["options"], "Account")
+        self.assertEqual(profile_fields["bank_account"]["options"], "Account")
+        settlement_fields = {field["fieldname"] for field in settlement["fields"]}
+        self.assertTrue({"mode_of_payment", "clearing_account", "bank_account"} <= settlement_fields)

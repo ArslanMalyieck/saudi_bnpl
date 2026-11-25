@@ -24,19 +24,27 @@ bench --site your.site migrate
 
 ## Configure
 
-Create one BNPL Provider Account per company/provider pair.
+Create one BNPL Provider Account per company/provider pair. One provider
+account can be shared by multiple POS Profiles.
 
 - Provider Name: Tabby, Tamara, Emkan, NEO, Madfu
 - Company: target company
-- Mode of Payment: existing MoP configured to post to the clearing account for that company
-- Clearing Account: Asset/Balance Sheet account with account_type = Cash
-- Payout Bank Account: Bank account receiving provider deposits
+- POS Profiles: add every POS Profile that may use this provider. Each row
+  stores its own Mode of Payment, Clearing Account and Payout Bank Account; a
+  settlement takes these values from the selected POS Profile row.
+- API Key / API Secret: optional provider-level credentials. A POS Profile row
+  can override them with profile-specific credentials.
 - Supplier: the BNPL provider as Supplier master
+- Provider-level Mode of Payment, Clearing Account and Payout Bank Account are
+  fallback defaults for older accounts with no POS Profile rows.
 
 Notes
-- Do not change provider configs once used. You can disable/enable.
-- Ensure the Mode of Payment maps to the clearing account for this company (standard ERPNext setting).
+- Do not change accounting fields once used. You can disable/enable.
+- Ensure every profile's Mode of Payment maps to its clearing account for this
+  company (standard ERPNext setting).
 - The clearing account being classified as Cash can affect cash reports; finance must approve.
+- API secrets are stored as Frappe Password fields; never commit credentials to
+  the repository or paste them into app code.
 
 ## POS Sale Flow (at invoice time)
 

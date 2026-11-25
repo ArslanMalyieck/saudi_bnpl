@@ -7,6 +7,7 @@ from saudi_bnpl.financial import money, payment_row_ids
 from saudi_bnpl.saudi_bnpl.doctype.bnpl_settlement.bnpl_settlement import (
 	_group_payment_rows,
 	_query_provider_payment_rows,
+	configure_provider_for_profile,
 )
 
 
@@ -36,6 +37,7 @@ def validate_filters(filters):
 
 
 def get_rows(filters, provider, start, end):
+	configure_provider_for_profile(provider, filters.pos_profile)
 	query_start = date(1900, 1, 1)
 	query_end = end or date(9999, 12, 31)
 	raw = _query_provider_payment_rows(
