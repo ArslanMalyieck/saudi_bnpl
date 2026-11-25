@@ -12,11 +12,38 @@ function can_fetch(frm) {
         && frm.doc.from_date && frm.doc.to_date;
 }
 
+function bind_pos_profile_query(frm) {
+    const account = frm.doc.provider_account;
+    if (!account) {
+        frm.set_query("pos_profile", () => ({filters: {company: frm.doc.company}}));
+        return;
+    }
+    frappe.db.get_doc("BNPL Provider Account", account).then(provider => {
+        const allowed = (provider.profiles || [])
+            .filter(row => row.enabled)
+            .map(row => row.pos_profile)
+            .filter(Boolean);
+        frm.set_query("pos_profile", () => (
+            allowed.length
+                ? {filters: {name: ["in", allowed]}}
+                : {filters: {company: frm.doc.company}}
+        ));
+        if (allowed.length === 1 && !frm.doc.pos_profile) {
+            frm.set_value("pos_profile", allowed[0]);
+        } else if (allowed.length > 1 && frm.doc.pos_profile && !allowed.includes(frm.doc.pos_profile)) {
+            frm.set_value("pos_profile", null);
+        }
+    }).catch(() => {
+        frm.set_query("pos_profile", () => ({filters: {company: frm.doc.company}}));
+    });
+}
+
 frappe.ui.form.on("BNPL Settlement", {
     setup(frm) {
-        frm.set_query("pos_profile", () => ({filters: {company: frm.doc.company}}));
+        bind_pos_profile_query(frm);
     },
     refresh(frm) {
+        bind_pos_profile_query(frm);
         frm.set_df_property("invoices", "read_only", Boolean(frm.doc.journal_entry));
         if (frm.doc.journal_entry) {
             frm.dashboard.set_headline(__("Journal Entry {0} is linked. Invoice selections and accounting details are locked; verify the JE's actual status in ERPNext.", [frm.doc.journal_entry]));
@@ -75,6 +102,7 @@ frappe.ui.form.on("BNPL Settlement", {
         if (!frm.doc.provider_account || !frm.is_new()) return;
         frappe.db.get_value("BNPL Provider Account", frm.doc.provider_account, "company", r => {
             if (r && r.company) frm.set_value("company", r.company);
+            bind_pos_profile_query(frm);
         });
     },
     fee: recalculate_settlement,
