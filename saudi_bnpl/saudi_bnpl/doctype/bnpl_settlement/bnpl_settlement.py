@@ -491,3 +491,25 @@ def clear_settlement(name, cancel_journal=0):
     frappe.delete_doc("BNPL Settlement", settlement.name, force=True, ignore_permissions=True)
     return {"cleared": name}
 
+
+@frappe.whitelist(methods=["POST"])
+def clear_provider_account(name, cancel_journal=0):
+    """Safely clear every settlement and then delete an unused provider account."""
+    if not isinstance(name, str) or not name:
+        frappe.throw(_("Invalid provider account."), frappe.ValidationError)
+    provider = frappe.get_doc("BNPL Provider Account", name)
+    provider.check_permission("delete")
+
+    settlements = frappe.get_all(
+        "BNPL Settlement",
+        filters={"provider_account": name},
+        pluck="name",
+        limit_page_length=0,
+    )
+    for settlement_name in settlements:
+        clear_settlement(settlement_name, cancel_journal=cancel_journal)
+
+    frappe.delete_doc("BNPL Provider Account", name, force=True, ignore_permissions=True)
+    return {"cleared": name, "settlements": len(settlements)}
+
+

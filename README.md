@@ -76,7 +76,7 @@ A settlement without a Journal Entry can be deleted permanently. Use **Clear / R
 - No Journal Entry: deletes the settlement.
 - Draft Journal Entry: deletes the draft JE, releases its payment claims, and deletes the settlement.
 - Submitted Journal Entry: after explicit confirmation, cancels the JE (normal accounting reversal), releases claims, and deletes the settlement.
-- Provider Accounts with any settlements cannot be deleted; clear them or disable the provider account instead.
+- Provider Accounts with settlements use **Clear Provider Account**: it clears every settlement (with the same safe JE/claim rules), then deletes the provider and its POS Profile rows. Accounts with no settlements can be deleted normally.
 
 Generated entries use the dedicated `BNPL-JV-.YYYY.-` naming series (for example, `BNPL-JV-2026-00001`). They also carry read-only links to the BNPL Settlement, Provider Account, and POS Profile, the inclusive period, and the provider statement reference. The user remark repeats the provider, statement reference, profile, and inclusive period so the accounting purpose remains visible in Journal Entry and General Ledger drill-downs. These fields are populated only on app-generated entries; ordinary Journal Entries retain their configured naming series and behavior.
 
