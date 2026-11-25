@@ -12,6 +12,45 @@ function can_fetch(frm) {
         && frm.doc.from_date && frm.doc.to_date;
 }
 
+function clear_settlement(frm, cancel_journal) {
+    frappe.call({
+        method: "saudi_bnpl.saudi_bnpl.doctype.bnpl_settlement.bnpl_settlement.clear_settlement",
+        type: "POST",
+        args: {name: frm.doc.name, cancel_journal: cancel_journal ? 1 : 0},
+        freeze: true,
+        callback() {
+            frappe.show_alert({message: __("Settlement cleared."), indicator: "green"}, 5);
+            frappe.set_route("List", "BNPL Settlement");
+        },
+    });
+}
+
+function prompt_clear_settlement(frm) {
+    if (!frm.doc.journal_entry) {
+        frappe.confirm(__("Delete this settlement permanently?"), () => clear_settlement(frm, 0));
+        return;
+    }
+    frappe.db.get_value("Journal Entry", frm.doc.journal_entry, "docstatus", (r) => {
+        const status = r && r.docstatus;
+        if (status === 1) {
+            frappe.confirm(
+                __("This settlement has a submitted Journal Entry. Cancelling it will create the normal accounting reversal and release its payment claims. Continue?"),
+                () => clear_settlement(frm, 1)
+            );
+        } else if (status === 0) {
+            frappe.confirm(
+                __("This will delete the draft Journal Entry, release its payment claims and delete the settlement. Continue?"),
+                () => clear_settlement(frm, 0)
+            );
+        } else {
+            frappe.confirm(
+                __("This will release the cancelled Journal Entry's claims and delete the settlement. Continue?"),
+                () => clear_settlement(frm, 0)
+            );
+        }
+    });
+}
+
 function apply_provider_profile(frm, provider) {
     const rows = (provider.profiles || []).filter(row => row.enabled && row.pos_profile);
     const row = rows.find(item => item.pos_profile === frm.doc.pos_profile);
@@ -89,6 +128,9 @@ frappe.ui.form.on("BNPL Settlement", {
                     },
                 });
             });
+        }
+        if (!frm.is_new() && frm.has_perm("delete")) {
+            frm.add_custom_button(__("Clear / Reverse Settlement"), () => prompt_clear_settlement(frm));
         }
         if (!frm.is_new() && !frm.doc.journal_entry && frm.doc.status === "Open" && frm.has_perm("write")) {
             frm.add_custom_button(__("Create Draft Journal Entry"), () => {

@@ -69,6 +69,15 @@ Inputs: provider statement, inclusive settlement period, bank credit, and fee ta
    - Cr Clearing = Gross
 7. Finance reviews and submits the JE, then matches the single provider bank receipt in Bank Reconciliation. The app does not create a Payment Entry or submit the JE.
 
+### Clear / Reverse Settlement
+
+A settlement without a Journal Entry can be deleted permanently. Use **Clear / Reverse Settlement**:
+
+- No Journal Entry: deletes the settlement.
+- Draft Journal Entry: deletes the draft JE, releases its payment claims, and deletes the settlement.
+- Submitted Journal Entry: after explicit confirmation, cancels the JE (normal accounting reversal), releases claims, and deletes the settlement.
+- Provider Accounts with any settlements cannot be deleted; clear them or disable the provider account instead.
+
 Generated entries use the dedicated `BNPL-JV-.YYYY.-` naming series (for example, `BNPL-JV-2026-00001`). They also carry read-only links to the BNPL Settlement, Provider Account, and POS Profile, the inclusive period, and the provider statement reference. The user remark repeats the provider, statement reference, profile, and inclusive period so the accounting purpose remains visible in Journal Entry and General Ledger drill-downs. These fields are populated only on app-generated entries; ordinary Journal Entries retain their configured naming series and behavior.
 
 Both direct POS-created Sales Invoices and native POS Invoices are supported. Direct invoices must be submitted POS Sales Invoices and consolidated Sales Invoices are excluded. Native POS Invoices are eligible only after linkage to a submitted consolidated Sales Invoice. Amounts come from signed company-currency payment rows, not invoice grand total or outstanding amount, so mixed tenders, partial provider payments, and returns are represented correctly.
@@ -100,7 +109,7 @@ Draft JE:
 
 ## Permissions
 
-- BNPL Provider Account and BNPL Settlement: Accounts Manager (read/write/create)
+- BNPL Provider Account and BNPL Settlement: Accounts Manager (read/write/create/delete)
 - Journal Entry creation requires user to have JE create permission
 - BNPL Provider Ledger: Accounts Manager only
 

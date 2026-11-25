@@ -279,7 +279,9 @@ class BNPLSettlement(Document):
         return invoice
 
     def on_trash(self):
-        frappe.throw(_("Statements cannot be deleted; close them to reserve their reference."))
+        if self.journal_entry:
+            frappe.throw(_("Clear or cancel the linked Journal Entry before deleting this settlement."))
+
 
 
 def _existing_row_map(existing_rows, settlement=None):
@@ -446,3 +448,46 @@ def create_journal_entry(name):
     settlement.flags.creating_journal = True
     settlement.save()
     return journal.name
+
+
+@frappe.whitelist(methods=["POST"])
+def clear_settlement(name, cancel_journal=0):
+    """Delete an unposted settlement or safely reverse/clear its linked JE.
+
+    Draft JE: delete it and release its payment claims.
+    Submitted JE: cancel it (creating the normal accounting reversal) after an
+    explicit confirmation; then release claims and delete the settlement.
+    """
+    if not isinstance(name, str) or not name:
+        frappe.throw(_("Invalid settlement."), frappe.ValidationError)
+    settlement = frappe.get_doc("BNPL Settlement", name)
+    settlement.check_permission("delete")
+
+    if settlement.journal_entry:
+        journal = frappe.get_doc("Journal Entry", settlement.journal_entry)
+        if journal.docstatus == 1:
+            if not frappe.utils.cint(cancel_journal):
+                frappe.throw(
+                    _("This settlement has a submitted Journal Entry. Cancel it explicitly to reverse the accounting."),
+                    frappe.ValidationError,
+                )
+            journal.check_permission("cancel")
+            journal.cancel()
+        elif journal.docstatus == 0:
+            journal.check_permission("delete")
+            frappe.delete_doc("Journal Entry", journal.name, force=True, ignore_permissions=True)
+        elif journal.docstatus == 2:
+            pass
+
+    for claim_name in frappe.get_all(
+        "BNPL Payment Claim",
+        filters={"settlement": settlement.name},
+        pluck="name",
+        limit_page_length=0,
+    ):
+        frappe.delete_doc("BNPL Payment Claim", claim_name, force=True, ignore_permissions=True)
+
+    frappe.db.set_value("BNPL Settlement", settlement.name, "journal_entry", None, update_modified=False)
+    frappe.delete_doc("BNPL Settlement", settlement.name, force=True, ignore_permissions=True)
+    return {"cleared": name}
+

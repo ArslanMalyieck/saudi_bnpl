@@ -12,7 +12,7 @@ class MetadataTests(unittest.TestCase):
                 self.assertEqual(data["name"], name)
                 self.assertFalse(data.get("is_submittable"))
                 self.assertFalse(data.get("allow_rename"))
-                self.assertTrue(all(not p.get("delete") for p in data["permissions"]))
+                self.assertTrue(all(p.get("delete") for p in data["permissions"]))
                 self.assertEqual([p["role"] for p in data["permissions"]], ["Accounts Manager"])
                 self.assertEqual(set(data["field_order"]), {f["fieldname"] for f in data["fields"]})
                 if slug == "bnpl_provider_account":

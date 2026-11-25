@@ -107,4 +107,6 @@ class BNPLProviderAccount(Document):
                 frappe.throw(_("POS Profile {0}: Mode of Payment must map to its clearing account.").format(pos_profile))
 
     def on_trash(self):
-        frappe.throw(_("Provider configurations cannot be deleted; disable them instead."))
+        if frappe.db.exists("BNPL Settlement", {"provider_account": self.name}):
+            frappe.throw(_("Provider accounts with settlements cannot be deleted; clear those settlements or disable this account instead."))
+
