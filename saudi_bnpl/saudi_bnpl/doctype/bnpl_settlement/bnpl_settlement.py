@@ -30,21 +30,7 @@ def get_provider(name):
     return provider
 
 
-def provider_profile_names(provider):
-    return [
-        row.get("pos_profile")
-        for row in (provider.get("profiles") or [])
-        if row.get("enabled") and row.get("pos_profile")
-    ]
-
-
-def validate_provider_profile(provider, pos_profile):
-    allowed = provider_profile_names(provider)
-    if allowed and pos_profile not in allowed:
-        frappe.throw(_("{0} is not configured for this provider account.").format(pos_profile))
-
-
-def validate_period(company, pos_profile, from_date, to_date, provider=None):
+def validate_period(company, pos_profile, from_date, to_date):
     if not pos_profile or not from_date or not to_date:
         frappe.throw(_("POS Profile, From Date and To Date are required."))
     start, end = frappe.utils.getdate(from_date), frappe.utils.getdate(to_date)
@@ -52,8 +38,6 @@ def validate_period(company, pos_profile, from_date, to_date, provider=None):
         frappe.throw(_("From Date cannot be after To Date."))
     if frappe.db.get_value("POS Profile", pos_profile, "company") != company:
         frappe.throw(_("POS Profile must belong to the settlement company."))
-    if provider:
-        validate_provider_profile(provider, pos_profile)
     return start, end
 
 
@@ -171,7 +155,7 @@ class BNPLSettlement(Document):
         if self.status not in ("Open", "Closed"):
             frappe.throw(_("Operational status must be Open or Closed."))
         if not legacy_linked:
-            validate_period(self.company, self.pos_profile, self.from_date, self.to_date, provider)
+            validate_period(self.company, self.pos_profile, self.from_date, self.to_date)
             self._validate_rows()
         previous = self.get_doc_before_save()
         if previous:
@@ -290,7 +274,7 @@ def fetch_provider_invoices(provider_account, company, pos_profile, from_date, t
     provider.validate()
     if provider.company != company:
         frappe.throw(_("Company must match the provider configuration."))
-    start, end = validate_period(company, pos_profile, from_date, to_date, provider)
+    start, end = validate_period(company, pos_profile, from_date, to_date)
     settlement = None
     if settlement_name and frappe.db.exists("BNPL Settlement", settlement_name):
         settlement = frappe.get_doc("BNPL Settlement", settlement_name)
@@ -342,7 +326,7 @@ def fetch_provider_invoices(provider_account, company, pos_profile, from_date, t
 
 
 def _revalidate_selected_rows(settlement, provider):
-    start, end = validate_period(settlement.company, settlement.pos_profile, settlement.from_date, settlement.to_date, provider)
+    start, end = validate_period(settlement.company, settlement.pos_profile, settlement.from_date, settlement.to_date)
     selected = [row for row in settlement.invoices if row.selected]
     if not selected:
         frappe.throw(_("Select at least one provider invoice before creating the Journal Entry."))

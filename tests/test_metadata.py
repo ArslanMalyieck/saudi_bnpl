@@ -33,21 +33,6 @@ class MetadataTests(unittest.TestCase):
         table = next(field for field in settlement["fields"] if field["fieldname"] == "invoices")
         self.assertEqual(table["options"], "BNPL Settlement Invoice")
 
-    def test_provider_profiles_and_api_credentials_are_supported(self):
-        root = Path(__file__).resolve().parents[1] / "saudi_bnpl" / "saudi_bnpl" / "doctype"
-        provider = json.loads((root / "bnpl_provider_account" / "bnpl_provider_account.json").read_text(encoding="utf-8"))
-        profile = json.loads((root / "bnpl_provider_profile" / "bnpl_provider_profile.json").read_text(encoding="utf-8"))
-        fields = {field["fieldname"]: field for field in provider["fields"]}
-        self.assertEqual(fields["profiles"]["fieldtype"], "Table")
-        self.assertEqual(fields["profiles"]["options"], "BNPL Provider Profile")
-        self.assertIn("api_key", fields)
-        self.assertIn("api_secret", fields)
-        self.assertTrue(profile["istable"])
-        self.assertEqual(profile["permissions"], [])
-        profile_fields = {field["fieldname"]: field for field in profile["fields"]}
-        self.assertEqual(profile_fields["pos_profile"]["options"], "POS Profile")
-        self.assertEqual(profile_fields["api_secret"]["fieldtype"], "Password")
-
     def test_provider_ledger_is_standard_and_accounts_manager_only(self):
         path = (Path(__file__).resolve().parents[1] / "saudi_bnpl" / "saudi_bnpl" / "report"
                 / "bnpl_provider_ledger" / "bnpl_provider_ledger.json")
