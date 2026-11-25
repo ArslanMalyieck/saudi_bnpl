@@ -32,8 +32,6 @@ account can be shared by multiple POS Profiles.
 - POS Profiles: add every POS Profile that may use this provider. Each row
   stores its own Mode of Payment, Clearing Account and Payout Bank Account; a
   settlement takes these values from the selected POS Profile row.
-- API Key / API Secret: optional provider-level credentials. A POS Profile row
-  can override them with profile-specific credentials.
 - Supplier: the BNPL provider as Supplier master
 - Provider-level Mode of Payment, Clearing Account and Payout Bank Account are
   fallback defaults for older accounts with no POS Profile rows.
@@ -43,8 +41,6 @@ Notes
 - Ensure every profile's Mode of Payment maps to its clearing account for this
   company (standard ERPNext setting).
 - The clearing account being classified as Cash can affect cash reports; finance must approve.
-- API secrets are stored as Frappe Password fields; never commit credentials to
-  the repository or paste them into app code.
 
 ## POS Sale Flow (at invoice time)
 

@@ -50,8 +50,6 @@ class MetadataTests(unittest.TestCase):
         fields = {field["fieldname"]: field for field in provider["fields"]}
         self.assertEqual(fields["profiles"]["fieldtype"], "Table")
         self.assertEqual(fields["profiles"]["options"], "BNPL Provider Profile")
-        self.assertIn("api_key", fields)
-        self.assertIn("api_secret", fields)
         self.assertTrue(profile["istable"])
         self.assertEqual(profile["permissions"], [])
         profile_fields = {field["fieldname"]: field for field in profile["fields"]}

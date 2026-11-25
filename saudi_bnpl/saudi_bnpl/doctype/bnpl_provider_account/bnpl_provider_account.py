@@ -66,11 +66,6 @@ class BNPLProviderAccount(Document):
             frappe.throw(_("Provider supplier must exist and be enabled."))
 
     def _validate_credentials_and_profiles(self):
-        api_key = self.get("api_key") or ""
-        api_secret = self.get("api_secret") or ""
-        if bool(api_key) != bool(api_secret):
-            frappe.throw(_("Provider API Key and API Secret must be provided together."))
-
         seen = set()
         for row in self.get("profiles") or []:
             pos_profile = row.get("pos_profile")
@@ -110,11 +105,6 @@ class BNPLProviderAccount(Document):
             mappings = [account.default_account for account in mode.accounts if account.company == self.company]
             if mappings != [clearing_name]:
                 frappe.throw(_("POS Profile {0}: Mode of Payment must map to its clearing account.").format(pos_profile))
-
-            row_key = row.get("api_key") or ""
-            row_secret = row.get("api_secret") or ""
-            if bool(row_key) != bool(row_secret):
-                frappe.throw(_("POS Profile {0}: API Key and API Secret must be provided together.").format(pos_profile))
 
     def on_trash(self):
         frappe.throw(_("Provider configurations cannot be deleted; disable them instead."))
